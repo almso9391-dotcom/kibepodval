@@ -215,7 +215,7 @@ function render(){hud();
   if(tab==='top'){
     h+='<h3>Рейтинг сетей</h3>'+(SB_URL?'<div id="lb" class="list"><p class="note">Загружаю…</p></div>':'<p class="note">Общий рейтинг включится, когда игру подключат к базе (настройка у автора).</p>');
     h+=`<div class="goal">Стоимость твоей сети: <b>${fmt(worth())}</b></div>`;
-    if(SB_URL) h+='<button class="btn" style="width:100%;margin-top:10px" data-send="1">Отправить свой результат</button>';
+    if(SB_URL) h+='<button class="btn" style="width:100%;margin-top:10px" data-send="1">Отправить свой результат</button><p class="note" id="sendst"></p>';
   }
   if(tab==='me'){
     h+=`<h3>Название сети</h3><div class="row"><input type="text" id="brand" maxlength="18" value="${esc(S.brand)}"><button class="btn" data-brand="1">Сохранить</button></div>`;
@@ -232,12 +232,16 @@ function me(){const u=TG&&TG.initDataUnsafe&&TG.initDataUnsafe.user;let id;try{i
   return u?{id:'tg'+u.id,name:(u.first_name||'Игрок')+(u.username?' @'+u.username:'')}:{id,name:'Игрок '+id.slice(-4)}}
 async function loadTop(){const el=$('#lb');if(!el)return;
   try{const r=await fetch(SB_URL+'/rest/v1/scores?select=name,brand,score,clubs,day&order=score.desc&limit=50',{headers:SBH()});
-    const rows=await r.json(); if(!Array.isArray(rows)||!rows.length){el.innerHTML='<p class="note">Пока пусто — будь первым.</p>';return}
+    const rows=await r.json(); if(!r.ok||!Array.isArray(rows)){el.innerHTML='<p class="note">Ошибка базы: '+esc((rows&&(rows.message||rows.hint))||r.status)+'</p>';return}
+    if(!rows.length){el.innerHTML='<p class="note">Пока пусто — будь первым.</p>';return}
     el.innerHTML=rows.map((x,i)=>`<div class="item"><div><h4>${i+1}. ${esc(x.brand)}</h4><p>${esc(x.name)} · ${esc(x.clubs)} клуб. · день ${esc(x.day)}</p></div><b class="money">${fmt(+x.score||0)}</b></div>`).join('')}
   catch(e){el.innerHTML='<p class="note">Рейтинг сейчас недоступен.</p>'}}
 async function sendTop(){const m=me();
-  try{await fetch(SB_URL+'/rest/v1/scores',{method:'POST',headers:Object.assign(SBH(),{'Content-Type':'application/json',Prefer:'resolution=merge-duplicates'}),body:JSON.stringify({id:m.id,name:m.name.slice(0,40),brand:S.brand.slice(0,18),score:worth(),clubs:S.clubs.length,day:S.day})});loadTop()}
-  catch(e){}}
+  const st=$('#sendst'); if(st) st.textContent='Отправляю…';
+  try{const r=await fetch(SB_URL+'/rest/v1/scores',{method:'POST',headers:Object.assign(SBH(),{'Content-Type':'application/json',Prefer:'resolution=merge-duplicates'}),body:JSON.stringify({id:m.id,name:m.name.slice(0,40),brand:S.brand.slice(0,18),score:worth(),clubs:S.clubs.length,day:S.day})});
+    if(r.ok){if(st)st.textContent='Результат отправлен ✓'}else{let t='';try{const j=await r.json();t=j.message||j.hint||''}catch(e){} if(st)st.textContent='Не отправилось: '+(t||r.status)}
+    loadTop()}
+  catch(e){if(st)st.textContent='Нет связи с рейтингом'}}
 function sheet(html){$('#sheet').innerHTML=html;$('#modal').classList.add('on')}
 function closeSheet(){$('#modal').classList.remove('on')}
 const EVENTS=[
